@@ -65,7 +65,7 @@ func InitBlockChain(address string) *BlockChain {
 
 // Get the  current chain for the address
 func CountinueBlockChain(address string) *BlockChain {
-	if DBexists() == false {
+	if !DBexists() {
 		fmt.Println("No existing Blockchain found, create one !!!")
 		runtime.Goexit()
 	}
@@ -197,7 +197,7 @@ func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 			}
 
 			// case if not the first transaction
-			if tx.IsCoinbase() == false {
+			if !tx.IsCoinbase() {
 				for _, in := range tx.Inputs {
 					if in.CanUnlock(address) {
 						inTxID := hex.EncodeToString(in.ID)
