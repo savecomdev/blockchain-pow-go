@@ -15,4 +15,4 @@
 # vendor/
 
 # Dev directories
-tmp/
+tmp/*
