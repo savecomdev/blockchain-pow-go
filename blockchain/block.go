@@ -8,10 +8,10 @@ import (
 )
 
 type Block struct {
-	Hash        []byte
-	Transaction []*Transaction
-	PrevHash    []byte
-	Nonce       int
+	Hash         []byte
+	Transactions []*Transaction
+	PrevHash     []byte
+	Nonce        int
 }
 
 func ErrorHandler(err error) {
@@ -65,7 +65,7 @@ func (b *Block) HashTransaction() []byte {
 	var txHash [32]byte
 
 	// populate the maps of transaction hashes
-	for _, tx := range b.Transaction {
+	for _, tx := range b.Transactions {
 		txHashes = append(txHashes, tx.ID)
 	}
 

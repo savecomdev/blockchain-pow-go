@@ -1,7 +1,10 @@
 package blockchain
 
 import (
+	"bytes"
+	"crypto/ecdsa"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -166,7 +169,7 @@ func DBexists() bool {
 }
 
 // Retreive all transactions without outputs
-func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
+func (chain *BlockChain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
 	var unspentTxs []Transaction
 
 	// create tempory maps for outputs
@@ -178,7 +181,7 @@ func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 	for {
 		block := iter.Next()
 
-		for _, tx := range block.Transaction {
+		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
 
 		OutputsLoop:
@@ -191,7 +194,7 @@ func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 					}
 				}
 
-				if out.CanBeUnlocked(address) {
+				if out.IsLockedWithKey(pubKeyHash) {
 					unspentTxs = append(unspentTxs, *tx)
 				}
 			}
@@ -199,7 +202,7 @@ func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 			// case if not the first transaction
 			if !tx.IsCoinbase() {
 				for _, in := range tx.Inputs {
-					if in.CanUnlock(address) {
+					if in.UsesKey(pubKeyHash) {
 						inTxID := hex.EncodeToString(in.ID)
 						spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Out)
 					}
@@ -217,13 +220,13 @@ func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 }
 
 // Retreive all the output transactions
-func (chain *BlockChain) FindUTXO(address string) []TxOutput {
+func (chain *BlockChain) FindUTXO(pubKeyHash []byte) []TxOutput {
 	var UTXOs []TxOutput
-	unspentTransactions := chain.FindUnspentTransactions(address)
+	unspentTransactions := chain.FindUnspentTransactions(pubKeyHash)
 
 	for _, tx := range unspentTransactions {
 		for _, out := range tx.Outputs {
-			if out.CanBeUnlocked(address) {
+			if out.IsLockedWithKey(pubKeyHash) {
 				UTXOs = append(UTXOs, out)
 			}
 		}
@@ -233,9 +236,9 @@ func (chain *BlockChain) FindUTXO(address string) []TxOutput {
 }
 
 // Retreive all the available output transaction for an amount
-func (chain *BlockChain) FincSpendabaleOutputs(address string, amount int) (int, map[string][]int) {
+func (chain *BlockChain) FincSpendabaleOutputs(pubKeyHash []byte, amount int) (int, map[string][]int) {
 	unspentOuts := make(map[string][]int)
-	unspentTransactions := chain.FindUnspentTransactions(address)
+	unspentTransactions := chain.FindUnspentTransactions(pubKeyHash)
 	accumulated := 0
 
 Work:
@@ -244,7 +247,7 @@ Work:
 
 		for outIdx, out := range tx.Outputs {
 			// check if the address is good and add enough coins for the amount
-			if out.CanBeUnlocked(address) && accumulated < amount {
+			if out.IsLockedWithKey(pubKeyHash) && accumulated < amount {
 				accumulated += out.Value
 				unspentOuts[txID] = append(unspentOuts[txID], outIdx)
 
@@ -256,4 +259,52 @@ Work:
 	}
 
 	return accumulated, unspentOuts
+}
+
+// Search a transaction into the chain by the ID
+func (chain *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
+	iter := chain.Iterator()
+
+	for {
+		block := iter.Next()
+
+		for _, tx := range block.Transactions {
+			if bytes.Compare(tx.ID, ID) == 0 {
+				return *tx, nil
+			}
+		}
+
+		// breaj=k the loop at the last block of the chain
+		if len(block.PrevHash) == 0 {
+			break
+		}
+	}
+
+	return Transaction{}, errors.New("Transaction doesn't exist!!!")
+}
+
+// Function to sign a transaction into the chain
+func (chain *BlockChain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
+	prevTXs := make(map[string]Transaction)
+
+	for _, in := range tx.Inputs {
+		prevTX, err := chain.FindTransaction(in.ID)
+		ErrorHandler(err)
+		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+	}
+
+	tx.Sign(privKey, prevTXs)
+}
+
+// Function to verify a transaction into the chain
+func (chain *BlockChain) VerifyTransaction(tx *Transaction) bool {
+	prevTXs := make(map[string]Transaction)
+
+	for _, in := range tx.Inputs {
+		prevTX, err := chain.FindTransaction(in.ID)
+		ErrorHandler(err)
+		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+	}
+
+	return tx.Verify(prevTXs)
 }
