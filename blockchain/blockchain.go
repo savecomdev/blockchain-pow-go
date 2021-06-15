@@ -100,6 +100,7 @@ func CountinueBlockChain(address string) *BlockChain {
 	return &chain
 }
 
+// Add a new block into the chain
 func (chain *BlockChain) AddBlock(txs []*Transaction) *Block {
 	var lastHash []byte
 
@@ -220,7 +221,7 @@ func (chain *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
 		block := iter.Next()
 
 		for _, tx := range block.Transactions {
-			if bytes.Compare(tx.ID, ID) == 0 {
+			if bytes.Equal(tx.ID, ID) {
 				return *tx, nil
 			}
 		}
@@ -231,7 +232,7 @@ func (chain *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
 		}
 	}
 
-	return Transaction{}, errors.New("Transaction doesn't exist!!!")
+	return Transaction{}, errors.New("Transaction doesn't exist")
 }
 
 // Function to sign a transaction into the chain
@@ -249,6 +250,10 @@ func (chain *BlockChain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateK
 
 // Function to verify a transaction into the chain
 func (chain *BlockChain) VerifyTransaction(tx *Transaction) bool {
+	if tx.IsCoinbase() {
+		return true
+	}
+
 	prevTXs := make(map[string]Transaction)
 
 	for _, in := range tx.Inputs {

@@ -16,6 +16,10 @@ import (
 	"github.com/savecomdev/blockchain-pow-go/wallet"
 )
 
+var (
+	defaultReward = 20
+)
+
 type Transaction struct {
 	ID      []byte
 	Inputs  []TxInput
@@ -62,30 +66,19 @@ func NewTransaction(from, to string, amount int, UTXO UTXOSet) *Transaction {
 
 func CoinBaseTx(to, data string) *Transaction {
 	if data == "" {
-		data = fmt.Sprintf("Coins to %s", to)
+		randData := make([]byte, 24)
+		_, err := rand.Read(randData)
+		ErrorHandler(err)
+		data = fmt.Sprintf("%x", randData)
 	}
 
 	txin := TxInput{[]byte{}, -1, nil, []byte(data)}
-	txout := NewTXOutput(100, to)
+	txout := NewTXOutput(defaultReward, to)
 
 	tx := Transaction{nil, []TxInput{txin}, []TxOutput{*txout}}
-	tx.SetID()
+	tx.ID = tx.Hash()
 
 	return &tx
-}
-
-// Generate an unique ID as hash
-func (tx *Transaction) SetID() {
-	var encoded bytes.Buffer
-	var hash [32]byte
-
-	encode := gob.NewEncoder(&encoded)
-	err := encode.Encode(tx)
-
-	ErrorHandler(err)
-
-	hash = sha256.Sum256(encoded.Bytes())
-	tx.ID = hash[:]
 }
 
 func (tx *Transaction) IsCoinbase() bool {
