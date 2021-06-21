@@ -26,15 +26,32 @@ type Transaction struct {
 	Outputs []TxOutput
 }
 
-func NewTransaction(from, to string, amount int, UTXO UTXOSet) *Transaction {
+// Convert a slice of byte into a Transaction
+func DeserializeTransaction(data []byte) Transaction {
+	var transaction Transaction
+
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(&transaction)
+	ErrorHandler(err)
+	return transaction
+}
+
+// Convert a transaction into a slice of byte
+func (tx Transaction) Serialize() []byte {
+	var encoded bytes.Buffer
+
+	enc := gob.NewEncoder(&encoded)
+	err := enc.Encode(tx)
+	ErrorHandler(err)
+
+	return encoded.Bytes()
+}
+
+func NewTransaction(w *wallet.Wallet, to string, amount int, UTXO *UTXOSet) *Transaction {
 	var inputs []TxInput
 	var outputs []TxOutput
 
-	wallets, err := wallet.CreateWallets()
-	ErrorHandler(err)
-	w := wallets.GetWallet(from)
 	pubKeyHash := wallet.PublicKeyHash(w.PublicKey)
-
 	acc, validOutputs := UTXO.FindSpendabaleOutputs(pubKeyHash, amount)
 
 	if acc < amount {
@@ -50,6 +67,8 @@ func NewTransaction(from, to string, amount int, UTXO UTXOSet) *Transaction {
 			inputs = append(inputs, input)
 		}
 	}
+
+	from := fmt.Sprintf("%s", w.Address())
 
 	outputs = append(outputs, *NewTXOutput(amount, to))
 
@@ -83,16 +102,6 @@ func CoinBaseTx(to, data string) *Transaction {
 
 func (tx *Transaction) IsCoinbase() bool {
 	return len(tx.Inputs) == 1 && len(tx.Inputs[0].ID) == 0 && tx.Inputs[0].Out == -1
-}
-
-func (tx Transaction) Serialize() []byte {
-	var encoded bytes.Buffer
-
-	enc := gob.NewEncoder(&encoded)
-	err := enc.Encode(tx)
-	ErrorHandler(err)
-
-	return encoded.Bytes()
 }
 
 func (tx *Transaction) Hash() []byte {

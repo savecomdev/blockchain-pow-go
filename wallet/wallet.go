@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -68,17 +67,6 @@ func Checksum(payload []byte) []byte {
 	return secondHash[:checksumLength]
 }
 
-func Base58Encode(input []byte) []byte {
-	encode := base58.Encode(input)
-	return []byte(encode)
-}
-
-func Base58Decode(input []byte) []byte {
-	decode, err := base58.Decode(string(input[:]))
-	ErrorHandler(err)
-	return decode
-}
-
 // Generate a safaty wallet address
 func (w Wallet) Address() []byte {
 	pubHash := PublicKeyHash(w.PublicKey)
@@ -91,9 +79,9 @@ func (w Wallet) Address() []byte {
 
 	address := Base58Encode(fullHash)
 
-	fmt.Printf("pub key: %x\n", w.PublicKey)
-	fmt.Printf("pub hash: %x\n", pubHash)
-	fmt.Printf("address: %x\n", address)
+	fmt.Printf("Pub key: %x\n", w.PublicKey)
+	fmt.Printf("Pub hash: %x\n", pubHash)
+	fmt.Printf("Address: %x\n", address)
 
 	return address
 }
@@ -109,5 +97,5 @@ func ValidateAddress(address string) bool {
 
 	targetCheckcum := Checksum(append([]byte{version}, pubKeyHash...))
 
-	return bytes.Compare(actualChecksum, targetCheckcum) == 0
+	return bytes.Equal(actualChecksum, targetCheckcum)
 }
